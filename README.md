@@ -1,5 +1,5 @@
 # MiniJira
-
+-
 A small full-stack project management app inspired by Jira. Built with **Node.js + Express + PostgreSQL** on the backend and **React (Vite)** on the frontend, using raw SQL via the `pg` package and JWT-based authentication.
 
 The frontend is fully responsive and works on phones as well as desktop.
