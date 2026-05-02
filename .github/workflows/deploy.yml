@@ -37,7 +37,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: ./frontend
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Run frontend tests
         working-directory: ./frontend
@@ -81,7 +81,7 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
-          npm install
+          npm install --legacy-peer-deps
           npm run build
 
       - name: Upload to S3
