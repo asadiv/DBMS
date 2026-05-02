@@ -5,74 +5,84 @@ on:
     branches: [main]
 
 jobs:
-  # ─── JOB 1: Run Backend Tests ───────────────────────────
+  # ─── JOB 1: Backend Tests ───────────────────────────────
   test-backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: '20'
-
       - name: Install backend dependencies
         working-directory: ./backend
         run: npm install
-
       - name: Run backend tests
         working-directory: ./backend
         run: npm test
 
-  # ─── JOB 2: Run Frontend Tests ──────────────────────────
+  # ─── JOB 2: Frontend Tests ──────────────────────────────
   test-frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: '20'
-
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm install --legacy-peer-deps
-
       - name: Run frontend tests
         working-directory: ./frontend
         run: npm test -- --watchAll=false
 
-  # ─── JOB 3: Deploy Backend to EC2 ───────────────────────
+  # ─── JOB 3: Build & Push Docker Image to ECR ────────────
   deploy-backend:
-    needs: [test-backend, test-frontend]   # only runs if both tests pass
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Deploy to EC2 via SSH
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest ./backend
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+
+      - name: Deploy on EC2 via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/minijira
-            git pull origin main
-            cd backend
-            npm install --production
-            pm2 restart minijira-backend || pm2 start server.js --name minijira-backend
-            pm2 save
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+            docker stop minijira-backend || true
+            docker rm minijira-backend || true
+            docker run -d \
+              --name minijira-backend \
+              --restart always \
+              -p 5000:5000 \
+              --env-file ~/DBMS/backend/.env \
+              ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
 
-  # ─── JOB 4: Deploy Frontend to S3 ───────────────────────
+  # ─── JOB 4: Build & Deploy Frontend to S3 ───────────────
   deploy-frontend:
-    needs: [test-backend, test-frontend]   # only runs if both tests pass
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: '20'
 
@@ -84,7 +94,7 @@ jobs:
           npm install --legacy-peer-deps
           npm run build
 
-      - name: Upload to S3
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
