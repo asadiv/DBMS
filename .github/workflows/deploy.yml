@@ -66,7 +66,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-            docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+            docker pull 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest
             docker stop minijira-backend || true
             docker rm minijira-backend || true
             docker run -d \
@@ -74,7 +74,7 @@ jobs:
               --restart always \
               -p 5000:5000 \
               --env-file ~/DBMS/backend/.env \
-              ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+              399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest
 
   # ─── JOB 4: Build & Deploy Frontend to S3 ───────────────
   deploy-frontend:
