@@ -13,10 +13,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
-      - name: Install backend dependencies
+      - name: Install dependencies
         working-directory: ./backend
         run: npm install
-      - name: Run backend tests
+      - name: Run tests
         working-directory: ./backend
         run: npm test
 
@@ -28,14 +28,14 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
-      - name: Install frontend dependencies
+      - name: Install dependencies
         working-directory: ./frontend
         run: npm install --legacy-peer-deps
-      - name: Run frontend tests
+      - name: Run tests
         working-directory: ./frontend
         run: npm test -- --watchAll=false
 
-  # ─── JOB 3: Build & Push Docker Image to ECR ────────────
+  # ─── JOB 3: Build & Push Backend Image ──────────────────
   deploy-backend:
     needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
@@ -47,65 +47,53 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ap-south-1
 
-      - name: Login to Amazon ECR
-        id: login-ecr
+      - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push Docker image
+      - name: Build and push backend image
         run: |
           docker build -t 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest ./backend
           docker push 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest
 
-      - name: Deploy on EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-            docker pull 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest
-            docker stop minijira-backend || true
-            docker rm minijira-backend || true
-            docker run -d \
-              --name minijira-backend \
-              --restart always \
-              -p 5000:5000 \
-              --env-file ~/DBMS/backend/.env \
-              399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest
-
-  # ─── JOB 4: Build & Deploy Frontend to S3 ───────────────
+  # ─── JOB 4: Build & Push Frontend Image ─────────────────
   deploy-frontend:
     needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Install and build frontend
-        working-directory: ./frontend
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: |
-          npm install --legacy-peer-deps
-          npm run build
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ap-south-1
 
-      - name: Sync to S3
-        run: aws s3 sync ./frontend/dist s3://${{ secrets.S3_BUCKET }} --delete
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Invalidate CloudFront cache
+      - name: Build and push frontend image
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
+          docker build -t 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-frontend:latest ./frontend
+          docker push 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-frontend:latest
+
+  # ─── JOB 5: Deploy Both on EC2 ───────────────────────────
+  deploy-ec2:
+    needs: [deploy-backend, deploy-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 399827113344.dkr.ecr.ap-south-1.amazonaws.com
+            cd ~/DBMS
+            docker pull 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest
+            docker pull 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-frontend:latest
+            docker compose down
+            docker compose up -d

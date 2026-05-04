@@ -2,20 +2,22 @@ version: '3.8'
 
 services:
   backend:
-    build: ./backend
-    ports:
-      - "5000:5000"
+    image: 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest
+    container_name: minijira-backend
+    restart: always
     env_file:
       - ./backend/.env
-    restart: always
+    expose:
+      - "5000"
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_URL: http://localhost:5000
+    image: 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-frontend:latest
+    container_name: minijira-frontend
+    restart: always
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl
     depends_on:
       - backend
-    restart: always
