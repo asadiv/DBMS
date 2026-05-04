@@ -8,6 +8,20 @@ jobs:
   # ─── JOB 1: Backend Tests ───────────────────────────────
   test-backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: minijira_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
@@ -16,8 +30,14 @@ jobs:
       - name: Install dependencies
         working-directory: ./backend
         run: npm install
+      - name: Run schema on test DB
+        run: psql postgresql://postgres:testpassword@localhost:5432/minijira_test -f db_tables.sql
       - name: Run tests
         working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/minijira_test?sslmode=disable
+          JWT_SECRET: testsecret
+          PORT: 5000
         run: npm test
 
   # ─── JOB 2: Frontend Tests ──────────────────────────────
