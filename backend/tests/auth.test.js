@@ -15,7 +15,7 @@ describe('Auth Routes', () => {
           password: 'password123'
         });
 
-      expect(res.statusCode).toBe(200);
+      expect(res.statusCode).toBe(201);
       expect(res.body.data).toHaveProperty('token');
       expect(res.body.data.user).toHaveProperty('userID');
       expect(res.body.data.user.username).toBe('testuser_jest');
@@ -32,7 +32,7 @@ describe('Auth Routes', () => {
         .post('/api/auth/register')
         .send({ username: 'user2', email, password: 'password123' });
 
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(409);
       expect(res.body).toHaveProperty('error');
     });
 
