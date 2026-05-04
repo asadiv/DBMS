@@ -95,5 +95,5 @@ jobs:
             cd ~/DBMS
             docker pull 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-backend:latest
             docker pull 399827113344.dkr.ecr.ap-south-1.amazonaws.com/minijira-frontend:latest
-            docker compose down
-            docker compose up -d
+            docker-compose down
+            docker-compose up -d
