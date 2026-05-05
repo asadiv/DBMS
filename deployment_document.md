@@ -52,7 +52,7 @@ Browser
    |
    | HTTPS (port 443) / HTTP (port 80)
    v
-EC2 Instance (Ubuntu 24.04, t2.micro)
+EC2 Instance (Ubuntu 24.04, t3.micro)
    |
    +-- Docker Container: minijira-frontend (Nginx)
    |       - Serves React frontend files
@@ -271,6 +271,7 @@ curl http://localhost/health
 ---
 
 ## 7. Testing Evidence
+<img width="883" height="471" alt="successful tests" src="https://github.com/user-attachments/assets/cc7863cf-12b0-4772-8385-d79eb4e7ead0" />
 
 **Backend tests passing (run locally or in pipeline):**
 
@@ -300,12 +301,7 @@ Tests:       5 passed, 5 total
 **Live app responding from EC2:**
 
 ```bash
-curl http://13.234.34.103/health
-```
-
-Response:
-```json
-{"status": "ok"}
+curl http://13.234.34.103
 ```
 
 **Containers running on EC2:**
@@ -320,17 +316,17 @@ Shows both `minijira-backend` and `minijira-frontend` containers with status `Up
 
 ## 8. Challenges and Solutions
 
-**Challenge 1 — Mixed Content Error (HTTPS vs HTTP)**
+**Challenge 1 — Tests failed**
 
-After deploying the frontend on CloudFront (which uses HTTPS) and the backend on EC2 (which was plain HTTP), the browser blocked all API calls. The error was: `Blocked loading mixed active content`.
+After deploying the backend tests failed not because there was error in code, but the response that we were expecting in our tests were a bit different like when user is successfully created our code returned 201 while test expected 200.
 
-**Solution:** We moved the frontend off CloudFront and into a Nginx Docker container running on the same EC2 instance as the backend. Nginx serves the React app on port 443 with a self-signed SSL certificate, and routes all `/api` requests internally to the backend container. Since both are on the same server, there is no cross-origin issue.
+**Solution:** We made sure that our tests expect the right response that matches our code.
 
-**Challenge 2 — RDS SSL Certificate Rejection**
+**Challenge 2 container already exists**
 
-When the backend tried to connect to the RDS database, it got the error: `self-signed certificate in certificate chain`. Adding `?sslmode=require` alone was not enough because the pg library tried to verify the certificate chain, which failed with AWS's self-signed cert.
+one if our deployments failed due to a certain issue and after solving the issue when i pushed code again it failed saying container already exists.
 
-**Solution:** Changed the DATABASE_URL to use `?sslmode=no-verify` which tells the pg library to use SSL encryption but skip certificate verification. This is acceptable for a student project on AWS RDS.
+**Solution:** wrote extra code in deploy.yml to stop and remove a container before making another one, that way the issue was solved.
 
 **Challenge 3 — Docker Image Not Found on EC2**
 
@@ -348,6 +344,4 @@ After the GitHub Actions pipeline said it successfully pushed the Docker image t
 
 3. **GitHub Secrets and environment variables are not the same thing.** Secrets are only available inside GitHub Actions jobs — they are not automatically transferred to your server. The `.env` file on the server must be created separately.
 
-4. **Database security groups are important.** By default, RDS was open to the internet (`0.0.0.0/0`). We changed it to only allow connections from the EC2 security group, which means the database cannot be accessed from anywhere except our own server.
-
-5. **`--restart always` is essential for production.** Without it, if the server ever reboots (due to an AWS maintenance event or anything else), your containers stay stopped and your app goes offline. With `--restart always` in Docker Compose, containers come back up automatically.
+4. **`--restart always` is essential for production.** Without it, if the server ever reboots (due to an AWS maintenance event or anything else), your containers stay stopped and your app goes offline. With `--restart always` in Docker Compose, containers come back up automatically.
