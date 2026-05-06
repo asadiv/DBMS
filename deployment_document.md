@@ -157,6 +157,7 @@ The pipeline is defined in `.github/workflows/deploy.yml` and runs automatically
 **Job 5 — deploy-ec2:** Only runs after jobs 3 and 4 complete successfully. It SSHes into the EC2 instance, pulls the latest Docker images from ECR, and restarts both containers using Docker Compose.
 
 **If a test fails:** The deploy jobs never run. The server keeps running the previous working version. No broken code ever reaches production.
+<img width="1245" height="465" alt="deploy succes" src="https://github.com/user-attachments/assets/853ba640-3ce8-4857-9f19-1983cad8dfc6" />
 
 ---
 
@@ -321,6 +322,7 @@ Shows both `minijira-backend` and `minijira-frontend` containers with status `Up
 After deploying the backend tests failed not because there was error in code, but the response that we were expecting in our tests were a bit different like when user is successfully created our code returned 201 while test expected 200.
 
 **Solution:** We made sure that our tests expect the right response that matches our code.
+<img width="770" height="676" alt="test failed" src="https://github.com/user-attachments/assets/d6d2c63e-2dc2-4997-ac88-8a72c3a93548" />
 
 **Challenge 2 container already exists**
 
